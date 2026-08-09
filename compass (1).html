@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Compass</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-1: #071019;
+    --bg-2: #0c1f2b;
+    --bg-3: #0a2e33;
+    --glass: rgba(255,255,255,0.06);
+    --glass-border: rgba(255,255,255,0.16);
+    --glass-highlight: rgba(255,255,255,0.35);
+    --ink: #EAF1EF;
+    --ink-dim: rgba(234,241,239,0.55);
+    --gold: #D9A441;
+    --gold-soft: #f0c878;
+    --cyan: #5FD3C4;
+    --red: #E0654F;
+    --aurora-1: rgba(95,211,196,0.12);
+    --aurora-2: rgba(217,164,65,0.10);
+  }
+
+  [data-theme="light"]{
+    --bg-1: #EDE7DC;
+    --bg-2: #E4DCCB;
+    --bg-3: #D8CBAE;
+    --glass: rgba(255,255,255,0.45);
+    --glass-border: rgba(60,45,20,0.16);
+    --glass-highlight: rgba(255,255,255,0.6);
+    --ink: #2A2115;
+    --ink-dim: rgba(42,33,21,0.58);
+    --gold: #B87B22;
+    --gold-soft: #8A5A16;
+    --cyan: #1E8577;
+    --red: #C24A34;
+    --aurora-1: rgba(30,133,119,0.10);
+    --aurora-2: rgba(184,123,34,0.14);
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    height: 100%;
+    margin: 0;
+  }
+
+  body{
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Inter', sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 20% 15%, var(--aurora-1), transparent 45%),
+      radial-gradient(circle at 85% 80%, var(--aurora-2), transparent 50%),
+      linear-gradient(160deg, var(--bg-1) 0%, var(--bg-2) 55%, var(--bg-3) 100%);
+    overflow: hidden;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.4s ease, color 0.4s ease;
+  }
+
+  .card, .btn, .label, .degnum, .tick, .readout .dir, .readout .deg, .eyebrow, .hint{
+    transition: background 0.4s ease, border-color 0.4s ease, color 0.4s ease, box-shadow 0.4s ease;
+  }
+
+  /* ambient drifting light */
+  .aurora{
+    position: absolute;
+    inset: -20%;
+    background:
+      radial-gradient(600px 600px at var(--mx, 50%) var(--my, 30%), rgba(95,211,196,0.10), transparent 60%);
+    pointer-events: none;
+    transition: background-position 0.2s ease-out;
+    z-index: 0;
+  }
+
+  .stage{
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    padding: 32px 20px;
+  }
+
+  .eyebrow{
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    text-align: center;
+  }
+
+  /* ---------- Glass compass card ---------- */
+  .card{
+    position: relative;
+    width: min(78vw, 380px);
+    height: min(78vw, 380px);
+    border-radius: 50%;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    box-shadow:
+      0 20px 60px rgba(0,0,0,0.45),
+      inset 0 1px 1px rgba(255,255,255,0.4),
+      inset 0 -20px 40px rgba(0,0,0,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+  .card:active{ cursor: grabbing; }
+
+  /* glossy sweep highlight */
+  .card::before{
+    content:"";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.05) 30%, transparent 55%);
+    pointer-events: none;
+  }
+  .card::after{
+    content:"";
+    position: absolute;
+    top: 4%; left: 18%;
+    width: 64%; height: 10%;
+    border-radius: 50%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.30) 45%, rgba(255,255,255,0.30) 55%, transparent);
+    filter: blur(9px);
+    transform: rotate(-8deg);
+    pointer-events: none;
+  }
+
+  .dial{
+    position: relative;
+    width: 84%;
+    height: 84%;
+    border-radius: 50%;
+    transition: transform 0.12s linear;
+    will-change: transform;
+  }
+
+  .ticks{
+    position: absolute;
+    inset: 0;
+  }
+  .tick-line{
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 0; height: 50%;
+    transform-origin: 50% 0%;
+  }
+  .tick{
+    position: absolute;
+    bottom: 0; left: 50%;
+    width: 1px; height: 8%;
+    background: var(--ink-dim);
+    transform: translateX(-50%);
+  }
+  .tick.major{ background: var(--ink); width: 2px; height: 11%; }
+  .tick.cardinal{ background: var(--gold-soft); width: 2px; height: 13%; }
+
+  .degnum{
+    position: absolute;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 9px;
+    color: var(--ink-dim);
+    transform: translate(-50%, 0);
+  }
+
+  .label{
+    position: absolute;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: clamp(15px, 3.2vw, 19px);
+    transform: translate(-50%, -50%);
+    letter-spacing: 0.05em;
+  }
+  .label.N{ color: var(--gold-soft); }
+  .label.E, .label.S, .label.W{ color: var(--ink); opacity: 0.85; }
+
+  .ring{
+    position: absolute;
+    inset: 6%;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .ring.inner{ inset: 22%; border: 1px solid rgba(255,255,255,0.08); }
+
+  /* fixed housing (does not rotate) */
+  .housing{
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  /* needle stays visually pointing to true heading; sits on top, counter-rotates against dial rotation is not needed since dial itself carries markings and rotates opposite to heading */
+  .needle{
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 3px;
+    height: 78%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .needle .half{
+    position: absolute;
+    left: 50%;
+    width: 5px;
+    height: 50%;
+    transform: translateX(-50%);
+    border-radius: 3px;
+  }
+  .needle .north{
+    top: 0;
+    background: linear-gradient(180deg, var(--gold-soft), var(--gold));
+    clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  }
+  .needle .south{
+    bottom: 0;
+    background: linear-gradient(0deg, rgba(234,241,239,0.85), rgba(234,241,239,0.25));
+    clip-path: polygon(50% 100%, 100% 0%, 0% 0%);
+  }
+
+  .pivot{
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 14px; height: 14px;
+    transform: translate(-50%,-50%);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff, var(--gold) 60%, #8a6320 100%);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  }
+
+  .bezel-mark{
+    position: absolute;
+    left: 50%; top: -2px;
+    width: 0; height: 0;
+    transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 9px solid var(--cyan);
+    filter: drop-shadow(0 0 6px rgba(95,211,196,0.7));
+  }
+
+  /* ---------- Readout ---------- */
+  .readout{
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .readout .deg{
+    font-size: clamp(36px, 8vw, 48px);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .readout .deg-sym{
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--ink-dim);
+  }
+  .readout .dir{
+    font-size: clamp(20px, 5vw, 26px);
+    font-weight: 600;
+    color: var(--gold-soft);
+    min-width: 2.6ch;
+  }
+
+  .hint{
+    font-size: 12px;
+    color: var(--ink-dim);
+    text-align: center;
+    max-width: 280px;
+    line-height: 1.5;
+  }
+
+  .controls{
+    display: flex;
+    gap: 10px;
+  }
+  .btn{
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 10px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease, border-color 0.2s ease;
+  }
+  .btn:hover{ background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.3); }
+  .btn:active{ transform: scale(0.96); }
+  .btn.active{
+    background: rgba(95,211,196,0.18);
+    border-color: rgba(95,211,196,0.55);
+    color: var(--cyan);
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .dial{ transition: none; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="aurora" id="aurora"></div>
+
+  <div class="stage">
+    <div class="eyebrow">True Heading</div>
+
+    <div class="card" id="card" aria-label="Interactive compass, drag to rotate">
+      <div class="dial" id="dial">
+        <div class="ticks" id="ticks"></div>
+        <div class="label N" id="labelN" style="left:50%; top:6%;">N</div>
+        <div class="label E" id="labelE" style="left:94%; top:50%;">E</div>
+        <div class="label S" id="labelS" style="left:50%; top:94%;">S</div>
+        <div class="label W" id="labelW" style="left:6%; top:50%;">W</div>
+        <div class="ring"></div>
+        <div class="ring inner"></div>
+      </div>
+
+      <div class="housing">
+        <div class="bezel-mark"></div>
+        <div class="needle">
+          <div class="half north"></div>
+          <div class="half south"></div>
+        </div>
+        <div class="pivot"></div>
+      </div>
+    </div>
+
+    <div class="readout">
+      <span class="deg" id="degNum">000</span><span class="deg-sym">°</span>
+      <span class="dir" id="dirLabel">N</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="liveBtn">Use device compass</button>
+      <button class="btn" id="resetBtn">Reset</button>
+      <button class="btn" id="themeBtn">Light mode</button>
+    </div>
+
+    <p class="hint" id="hint">Drag the dial to look around, or turn on your device compass for a live heading.</p>
+  </div>
+
+<script>
+(function(){
+  const dial = document.getElementById('dial');
+  const card = document.getElementById('card');
+  const ticksWrap = document.getElementById('ticks');
+  const degNum = document.getElementById('degNum');
+  const dirLabel = document.getElementById('dirLabel');
+  const liveBtn = document.getElementById('liveBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const hint = document.getElementById('hint');
+  const aurora = document.getElementById('aurora');
+  const themeBtn = document.getElementById('themeBtn');
+
+  // ---------- Theme toggle ----------
+  const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+  function applyTheme(theme){
+    if(theme === 'light'){
+      document.documentElement.setAttribute('data-theme', 'light');
+      themeBtn.textContent = 'Dark mode';
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      themeBtn.textContent = 'Light mode';
+    }
+  }
+  applyTheme(prefersLight ? 'light' : 'dark');
+  themeBtn.addEventListener('click', () => {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    applyTheme(isLight ? 'dark' : 'light');
+  });
+
+  // Build tick marks
+  for(let deg = 0; deg < 360; deg += 3){
+    const isCardinal = deg % 90 === 0;
+    const isMajor = deg % 30 === 0;
+
+    const line = document.createElement('div');
+    line.className = 'tick-line';
+    line.style.transform = `rotate(${deg}deg)`;
+
+    const tick = document.createElement('div');
+    tick.className = 'tick' + (isCardinal ? ' cardinal' : (isMajor ? ' major' : ''));
+    line.appendChild(tick);
+    ticksWrap.appendChild(line);
+
+    if(deg % 30 === 0 && !isCardinal){
+      const num = document.createElement('div');
+      num.className = 'degnum';
+      num.textContent = deg;
+      const rad = (deg - 90) * Math.PI / 180;
+      const r = 38; // percent radius for number placement
+      const x = 50 + r * Math.cos(rad);
+      const y = 50 + r * Math.sin(rad);
+      num.style.left = x + '%';
+      num.style.top = y + '%';
+      num.style.transform = 'translate(-50%, -50%)';
+      ticksWrap.appendChild(num);
+    }
+  }
+
+  const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  function headingToDir(h){
+    const idx = Math.round(h / 22.5) % 16;
+    return dirs[idx];
+  }
+
+  // heading = degrees, dial rotates opposite direction so labels track real orientation
+  let heading = 0;
+  let displayed = 0;
+
+  function render(){
+    // smooth toward target heading
+    let diff = ((heading - displayed + 540) % 360) - 180;
+    displayed += diff * 0.18;
+    displayed = (displayed + 360) % 360;
+
+    dial.style.transform = `rotate(${-displayed}deg)`;
+    const shown = Math.round(displayed) % 360;
+    degNum.textContent = String(shown).padStart(3,'0');
+    dirLabel.textContent = headingToDir(shown);
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+
+  // ---------- Bright, satisfying "bubble pop" sound ----------
+  let audioCtx = null;
+  function getAudioCtx(){
+    if(!audioCtx){
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+  function playPop(){
+    let ctx;
+    try{ ctx = getAudioCtx(); } catch(err){ return; }
+    const now = ctx.currentTime;
+
+    // main pop — quick upward pitch flick, the classic "satisfying" bloop
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    const baseFreq = 520 + Math.random() * 60;
+    osc.frequency.setValueAtTime(baseFreq * 0.6, now);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.9, now + 0.028);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.2, now + 0.09);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.32, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.11);
+
+    // a touch of shimmer up top for that crisp, clean "content-creator" polish
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(baseFreq * 3, now);
+    const gain2 = ctx.createGain();
+    gain2.gain.setValueAtTime(0.0001, now);
+    gain2.gain.exponentialRampToValueAtTime(0.05, now + 0.008);
+    gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now);
+    osc2.stop(now + 0.06);
+  }
+
+  const POP_STEP = 6; // degrees of rotation per soft "thock"
+  let lastPopBucket = Math.floor(heading / POP_STEP);
+  function maybePop(newHeading){
+    const norm = ((newHeading % 360) + 360) % 360;
+    const bucket = Math.floor(norm / POP_STEP);
+    if(bucket !== lastPopBucket){
+      lastPopBucket = bucket;
+      playPop();
+    }
+  }
+
+  // ---------- Drag interaction ----------
+  let dragging = false;
+  let startAngle = 0;
+  let startHeading = 0;
+  let liveMode = false;
+
+  function angleFromCenter(clientX, clientY){
+    const rect = card.getBoundingClientRect();
+    const cx = rect.left + rect.width/2;
+    const cy = rect.top + rect.height/2;
+    return Math.atan2(clientY - cy, clientX - cx) * 180 / Math.PI;
+  }
+
+  function pointerDown(x, y){
+    if(liveMode) return;
+    dragging = true;
+    startAngle = angleFromCenter(x, y);
+    startHeading = heading;
+    card.style.cursor = 'grabbing';
+  }
+  function pointerMove(x, y){
+    if(!dragging) return;
+    const currentAngle = angleFromCenter(x, y);
+    const delta = currentAngle - startAngle;
+    heading = (startHeading + delta + 360) % 360;
+    maybePop(heading);
+  }
+  function pointerUp(){
+    dragging = false;
+    card.style.cursor = 'grab';
+  }
+
+  card.addEventListener('mousedown', e => pointerDown(e.clientX, e.clientY));
+  window.addEventListener('mousemove', e => {
+    pointerMove(e.clientX, e.clientY);
+    // ambient aurora parallax
+    aurora.style.setProperty('--mx', (e.clientX / window.innerWidth * 100) + '%');
+    aurora.style.setProperty('--my', (e.clientY / window.innerHeight * 100) + '%');
+  });
+  window.addEventListener('mouseup', pointerUp);
+
+  card.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    pointerDown(t.clientX, t.clientY);
+  }, {passive:true});
+  window.addEventListener('touchmove', e => {
+    if(!dragging) return;
+    const t = e.touches[0];
+    pointerMove(t.clientX, t.clientY);
+  }, {passive:true});
+  window.addEventListener('touchend', pointerUp);
+
+  resetBtn.addEventListener('click', () => {
+    heading = 0;
+    lastPopBucket = Math.floor(heading / POP_STEP);
+  });
+
+  // ---------- Device orientation (live compass) ----------
+  function handleOrientation(e){
+    let h = null;
+    if(typeof e.webkitCompassHeading === 'number'){
+      h = e.webkitCompassHeading; // iOS, already 0=N clockwise
+    } else if(e.alpha !== null){
+      h = 360 - e.alpha; // approximate for Android
+    }
+    if(h !== null){
+      heading = (h + 360) % 360;
+    }
+  }
+
+  liveBtn.addEventListener('click', async () => {
+    if(liveMode){
+      liveMode = false;
+      liveBtn.classList.remove('active');
+      liveBtn.textContent = 'Use device compass';
+      hint.textContent = 'Drag the dial to look around, or turn on your device compass for a live heading.';
+      window.removeEventListener('deviceorientation', handleOrientation);
+      return;
+    }
+
+    try{
+      if(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
+        const res = await DeviceOrientationEvent.requestPermission();
+        if(res !== 'granted'){
+          hint.textContent = 'Permission denied — drag the dial instead.';
+          return;
+        }
+      }
+      if(!('DeviceOrientationEvent' in window)){
+        hint.textContent = 'This device has no compass sensor — drag the dial instead.';
+        return;
+      }
+      liveMode = true;
+      liveBtn.classList.add('active');
+      liveBtn.textContent = 'Live · tap to stop';
+      hint.textContent = 'Reading your device\'s compass sensor in real time.';
+      window.addEventListener('deviceorientation', handleOrientation, true);
+    } catch(err){
+      hint.textContent = 'Could not access the compass sensor — drag the dial instead.';
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
